@@ -1,7 +1,14 @@
 const express = require('express');
 const fs = require('fs');
+const morgan = require('morgan');
 
 const app = express();
+// 1-middlewares
+// morgan will gave us the http method,url,status code,time it took to send back the res,size of res in bytes
+app.use(morgan('dev'));
+// no coloring status code
+app.use(morgan('tiny'));
+
 // created a middleware to get the data from req in express(wew wont have req.body if we dont write the line below)
 app.use(express.json());
 // root url and get http method in the 2nd argument we discuss what we want to do
@@ -19,14 +26,31 @@ app.use(express.json());
 //   res.send('you can post to this endpoint...');
 // });
 
+// 3rd argument is always the next parameters this is a global mw
+app.use((req, res, next) => {
+  // this mw applies to every req cuz we did not specified it
+  console.log('Hello from the middle ware!');
+  next();
+});
+
+app.use((req, res, next) => {
+  req.requestTime = new Date().toISOString();
+  next();
+});
+
 const tours = JSON.parse(
   fs.readFileSync(`${__dirname}/dev-data/data/tours-simple.json`)
 );
 
+// 2-route handlers
 app.get('/api/v1/tours', (req, res) => {
-  res
-    .status(200)
-    .send({ status: 'success', results: tours.length, data: tours });
+  console.log(req.requestTime);
+  res.status(200).send({
+    status: 'success',
+    requestedAt: req.requestTime,
+    results: tours.length,
+    data: tours,
+  });
 });
 
 app.post('/api/v1/tours', (req, res) => {
@@ -60,6 +84,12 @@ app.get('/api/v1/tours/:id', (req, res) => {
   res.status(200).send({ status: 'success', data: { tour } });
 });
 
+// if we move this mw here it wont clg because it's in order of our code and applies to the next ones
+app.use((req, res, next) => {
+  console.log('Hello from the middle ware!');
+  next();
+});
+
 app.patch('/api/v1/tours/:id', (req, res) => {
   if (req.params.id * 1 > tours.length) {
     return res.status(404).json({ status: 'failed', message: 'invalid id' });
@@ -74,6 +104,7 @@ app.delete('/api/v1/tours/:id', (req, res) => {
   res.status(204).json({ status: 'success', data: null });
 });
 
+// 4-start the server
 const port = 3000;
 // start a server
 app.listen(port, () => {
