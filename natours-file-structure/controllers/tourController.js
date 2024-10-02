@@ -5,16 +5,20 @@ const tours = JSON.parse(
 );
 
 exports.checkId = (req, res, next, val) => {
-  console.log(val)
-  if (val * 1 > tours.length) {
+  if (req.params.id * 1 > tours.length) {
     return res.status(404).json({ status: 'failed', message: 'invalid id' });
   }
   next();
 };
 
-exports.checkBody = (req, res) => {
-  console.log(req.body);
-  // next();
+// create a checkbody mw check if body contains the name and price property if not, send back 400(bad req) also add it to post handler
+exports.checkBody = (req, res, next) => {
+  if (!req.body.name || !req.body.price) {
+    return res
+      .status(400)
+      .json({ status: 'failed', message: 'missing name or price' });
+  }
+  next();
 };
 
 exports.getAllTours = (req, res) => {
