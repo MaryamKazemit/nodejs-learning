@@ -1,8 +1,82 @@
+/* eslint-disable no-undef */
 const Tour = require('./../model/toursModel');
+
+exports.aliasTopTours = async (req, res, next) => {
+  console.log('here in alias');
+  req.query.limit = '5';
+  req.query.sort = '-ratingsAverage,price';
+  req.query.fields = 'name,price,ratingsAverage,summary,difficulty';
+  next();
+};
 
 exports.getAllTours = async (req, res) => {
   try {
-    const tours = await Tour.find();
+    console.log('im here');
+    console.log(req.query);
+    // const tours = await Tour.find({
+    //   duration: 5,
+    //   difficulty: 'easy',
+    // });
+
+    // const tours = await Tour.find()
+    //   .where('duration')
+    //   .equals(5)
+    //   .where('difficulty')
+    //   .equals('easy');
+
+    // const tours = await Tour.find(req.query);
+
+    // create shallow copy(hard copy and destructure) of req.query object
+    const queryObj = { ...req.query };
+    const excludedFields = ['page', 'sort', 'limit', 'fields'];
+    excludedFields.forEach((el) => delete queryObj[el]);
+    // console.log(queryObj);
+    // add $ for filtering
+    let queryStr = JSON.stringify(queryObj);
+    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+    // console.log(queryStr);
+    // all of Tour.find(queryObj) will return a query thats why we can chain methods like where,... await the query to get the data
+    // const tours = await Tour.find(queryObj);
+    // another way here we first build the query and then exe it
+    // const query = Tour.find(queryObj);
+    // const query = Tour.find(JSON.parse(queryStr));
+    let query = Tour.find(JSON.parse(queryStr));
+    // const tours = await query;
+    // sort results by a passed query string
+    if (req.query.sort) {
+      // chain to the query so turned to let
+      const sortBy = req.query.sort.split(',').join(' ');
+      // console.log(sortBy);
+      query = query.sort(sortBy);
+    } else {
+      query = query.sort('-createdAt');
+    }
+
+    // field limiting
+    if (req.query.fields) {
+      const fields = req.query.fields.split(',').join(' ');
+      // projecting
+      query = query.select(fields);
+    } else {
+      query = query.select('-__v');
+    }
+
+    // pagination page=2&limit=10
+    // convert str to number and add defaukt value of 1 by ||
+    const page = req.query.page * 1 || 1;
+    const limit = req.query.limit * 1 || 100;
+    const skip = (page - 1) * limit;
+    // throw err on not existing page
+    if (req.query.page) {
+      const numTours = await Tour.countDocuments();
+      // throw error will auto and quickly move to catch block that we had
+      if (skip >= numTours) throw new Error('This page does not exists');
+    }
+    query = query.skip(skip).limit(limit);
+
+    // aliasing route to popular ones
+
+    const tours = await query;
     res.status(200).send({
       status: 'success',
       results: tours.length,
